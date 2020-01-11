@@ -1,0 +1,101 @@
+#include <ros.h>
+#include "Arduino.h"
+#include <digitalWriteFast.h>
+#include <std_msgs/Int16.h>
+#include <std_msgs/Float32.h>
+
+int lspeed=0,rspeed=0;
+volatile int lTicksCount=0,rTicksCount=0;
+
+//fl
+#define INA1 22     
+#define INA2 24
+
+//fr
+#define INA3 21     
+#define INA4 23
+
+//rl
+#define INA5 25     
+#define INA6 27
+
+//rr
+#define INA7 29     
+#define INA8 31
+
+  
+  
+#define lPWM 6              
+#define rPWM 7  
+   
+float alpha = 0.0;
+void lspeedcb( const std_msgs::Float32& speed){
+  lspeed = alpha*lspeed + (1-alpha)*int(speed.data*160);
+}
+
+void rspeedcb( const std_msgs::Float32& speed){
+  rspeed = alpha*rspeed + (1-alpha)*int(speed.data*160);
+}
+
+
+
+ros::NodeHandle nh;
+ 
+std_msgs::Int16 lticks;
+std_msgs::Int16 rticks;
+ros::Publisher lwheel("/lwheel", &lticks);
+ros::Publisher rwheel("/rwheel", &rticks);
+
+ros::Subscriber<std_msgs::Float32> lsub("/lmotor", &lspeedcb );
+ros::Subscriber<std_msgs::Float32> rsub("/rmotor", &rspeedcb );
+
+   
+void setup() {
+  
+  Serial.begin(115200);
+  pinMode(INA1, OUTPUT);
+  pinMode(INA2, OUTPUT); 
+  pinMode(INA3, OUTPUT);
+  pinMode(INA4, OUTPUT); 
+  pinMode(INA5, OUTPUT);
+  pinMode(INA6, OUTPUT); 
+  pinMode(INA7, OUTPUT);
+  pinMode(INA8, OUTPUT);
+  digitalWrite(INA1, LOW);
+  digitalWrite(INA2, HIGH);
+   digitalWrite(INA3, LOW);
+  digitalWrite(INA4, HIGH); 
+  digitalWrite(INA5, LOW);
+  digitalWrite(INA6, HIGH);
+   digitalWrite(INA7, LOW);
+  digitalWrite(INA8 ,HIGH);
+
+  analogWrite(lPWM, 0);
+  analogWrite(rPWM, 0);
+  // 2 and 3 PIN
+  pinMode(2,INPUT_PULLUP);
+  pinMode(3,INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(2), HandleLeftMotorInterruptA, RISING);
+  attachInterrupt(digitalPinToInterrupt(3), HandleRightMotorInterruptA, RISING);
+
+  nh.initNode();
+  nh.advertise(lwheel);
+  nh.advertise(rwheel);
+  nh.subscribe(lsub);  
+  nh.subscribe(rsub);
+}
+
+
+void loop() {
+  analogWrite(lPWM, int(lspeed));
+  analogWrite(rPWM, int(rspeed));
+  lticks.data = lTicksCount;
+  lwheel.publish( &lticks );
+  rticks.data = rTicksCount;
+  rwheel.publish( &rticks );
+  nh.spinOnce();
+ }
+
+
+void HandleLeftMotorInterruptA(){   lTicksCount++; }
+void HandleRightMotorInterruptA(){  rTicksCount++; }
